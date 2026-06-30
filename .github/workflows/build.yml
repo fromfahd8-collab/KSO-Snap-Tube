@@ -1,0 +1,48 @@
+name: Build KSO SnapTube Turbo V2
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install Chocolatey
+      run: Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+    - name: Install dependencies
+      run: choco install ffmpeg aria2 -y
+
+    - name: Install Python packages
+      run: pip install -r requirements.txt pyinstaller
+
+    - name: Build EXE with PyInstaller
+      run: pyinstaller --onefile --noconsole --name KSO_SnapTube_Turbo_V2 main.py
+
+    - name: Install Inno Setup
+      run: choco install innosetup -y
+
+    - name: Build Installer
+      run: ISCC.exe setup.iss
+
+    - name: Upload Portable EXE
+      uses: actions/upload-artifact@v4
+      with:
+        name: KSO_SnapTube_Turbo_V2_Portable
+        path: dist/KSO_SnapTube_Turbo_V2.exe
+
+    - name: Upload Setup EXE
+      uses: actions/upload-artifact@v4
+      with:
+        name: KSO_SnapTube_Turbo_V2_Setup
+        path: installer_output/KSO_SnapTube_Turbo_V2_Setup.exe
