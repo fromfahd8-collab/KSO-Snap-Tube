@@ -1,0 +1,66 @@
+name: Build KSO SnapTube Turbo V2
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Chocolatey tools (FFmpeg + Aria2 + Inno Setup)
+        shell: powershell
+        run: |
+          choco install ffmpeg   -y --no-progress
+          choco install aria2    -y --no-progress
+          choco install innosetup -y --no-progress
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build EXE with PyInstaller
+        run: pyinstaller --clean --noconfirm KSO_SnapTube_Turbo_V2.spec
+
+      - name: Verify EXE exists
+        shell: powershell
+        run: |
+          if (-not (Test-Path "dist\KSO_SnapTube_Turbo_V2.exe")) {
+            Write-Error "EXE not found! Build failed."
+            exit 1
+          }
+          Write-Host "EXE size: $((Get-Item 'dist\KSO_SnapTube_Turbo_V2.exe').Length / 1MB) MB"
+
+      - name: Build installer with Inno Setup
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path installer_output
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc setup.iss
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Inno Setup failed"
+            exit 1
+          }
+
+      - name: Upload Portable EXE as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KSO_SnapTube_Turbo_V2_Portable
+          path: dist\KSO_SnapTube_Turbo_V2.exe
+          retention-days: 30
+
+      - name: Upload Setup Installer as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KSO_SnapTube_Turbo_V2_Setup
+          path: installer_output\KSO_SnapTube_Turbo_V2_Setup.exe
+          retention-days: 30
